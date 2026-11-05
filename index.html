@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tính điện năng ban đêm và dung lượng pin lưu trữ</title>
+<style>
+:root{--navy:#1E3A5F;--or:#C2570B;--or2:#FDEBD3;--ink:#16212e;--mut:#5d6b7b;--bd:#d5dbe3;--bg:#eef1f5;--card:#fff;--ok:#15803d}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+h1{font-size:22px;margin:0 0 4px;color:var(--navy)}
+h2{font-size:16px;margin:0 0 10px;color:var(--navy)}
+.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 40px}
+.sub{color:var(--mut);margin:0 0 18px;max-width:70ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+.bar b{margin-right:4px}
+.chip{border:1px solid var(--bd);background:#fff;border-radius:999px;padding:5px 13px;cursor:pointer;font:inherit;color:var(--ink)}
+.chip:hover{border-color:var(--or)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.note{font-size:13px;color:var(--mut)}
+label.f{display:inline-flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--mut);font-weight:600}
+select,input{font:inherit;color:var(--ink);border:1px solid var(--bd);border-radius:6px;padding:6px 8px;background:#fff}
+input:focus,select:focus,.chip:focus-visible{outline:2px solid #f2b27c;border-color:var(--or)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:620px}
+th,td{border-bottom:1px solid var(--bd);padding:7px 6px;text-align:left;vertical-align:middle}
+th{font-size:12.5px;color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right}
+td input{width:74px;text-align:right}
+td input.nm{width:100%;text-align:left}
+td.kwh{font-weight:700;color:var(--navy);white-space:nowrap}
+tfoot td{border-bottom:0;font-weight:700;background:var(--or2)}
+.res{background:var(--navy);color:#fff;border-radius:8px;padding:18px;position:sticky;top:12px}
+.res small{display:block;color:#b9c8dc}
+.big{font-size:46px;line-height:1.05;font-weight:700;margin:2px 0 2px}
+.big span{font-size:18px;font-weight:600;margin-left:4px;color:#ffd9b3}
+.res hr{border:0;border-top:1px solid #36557c;margin:14px 0}
+.row{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.stack{display:flex;height:12px;border-radius:6px;overflow:hidden;background:#36557c;margin:8px 0 4px}
+.stack i{display:block;height:100%}
+.mods{width:100%;border-collapse:collapse;min-width:0;margin-top:4px}
+.mods td{border-bottom:1px solid #36557c;padding:4px 0;color:#fff}
+.mods td:last-child{text-align:right;color:#ffd9b3}
+pre{background:#f7f9fb;border:1px solid var(--bd);border-radius:6px;padding:10px 12px;overflow-x:auto;font:13px/1.55 Consolas,monospace;margin:6px 0}
+ul{margin:6px 0 0;padding-left:20px}
+@media print{.chip,.bar{display:none}.res{position:static}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Điện năng tiêu thụ ban đêm và dung lượng pin lưu trữ</h1>
+  <p class="sub">Điền số lượng, công suất trung bình và số giờ của từng thiết bị. Tổng điện năng đêm và dung lượng pin cần thiết sẽ tự cập nhật. Các con số mặc định là giả định sơ bộ, cần đối chiếu với thiết bị thực tế của khách.</p>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Thiết lập nhanh</h2>
+        <div class="bar"><b>Camera, tivi, wifi:</b>
+          <button class="chip" data-lv="A">A – Tối thiểu</button>
+          <button class="chip" data-lv="B">B – Tiêu chuẩn</button>
+          <button class="chip" data-lv="C">C – Tải cao</button>
+        </div>
+        <div class="bar" style="gap:14px;margin-top:10px">
+          <label class="f">Công suất máy lạnh
+            <select id="hp"><option value="0.4">1 HP (≈0,4 kW TB)</option><option value="0.6" selected>1,5 HP (≈0,6 kW TB)</option><option value="0.8">2 HP (≈0,8 kW TB)</option></select></label>
+          <label class="f">Số máy lạnh chạy cùng lúc
+            <select id="acn"></select></label>
+          <label class="f">Thời gian dùng
+            <select id="hrs"><option value="11">18h–05h (11 giờ)</option><option value="12" selected>18h–06h (12 giờ)</option><option value="13">18h–07h (13 giờ)</option></select></label>
+          <label class="f">Độ sâu xả pin (%)<input id="dod" type="number" min="50" max="100" value="90" style="width:80px"></label>
+          <label class="f">Hiệu suất chuyển đổi (%)<input id="eff" type="number" min="50" max="100" value="92" style="width:80px"></label>
+        </div>
+        <div class="note">Chọn công suất máy lạnh và số giờ sẽ ghi đè vào các dòng tương ứng trong bảng. Sau đó vẫn sửa tay từng dòng được.</div>
+      </div>
+
+      <div class="card">
+        <h2>Bảng tính điện năng đêm (18h–06h)</h2>
+        <div class="tw"><table>
+          <thead><tr><th>Thiết bị</th><th class="n">Số lượng</th><th class="n">Công suất TB (kW)</th><th class="n">Giờ chạy</th><th>Cách tính</th><th class="n">kWh</th></tr></thead>
+          <tbody id="rows"></tbody>
+          <tfoot><tr><td colspan="5">Tổng điện năng ban đêm</td><td class="n" id="tot"></td></tr></tfoot>
+        </table></div>
+        <div class="note" style="margin-top:8px">Công suất TB là công suất điện thực tế bình quân cả đêm, không phải công suất danh định. Máy giặt tính theo số mẻ nhân điện năng mỗi mẻ (kWh/mẻ).</div>
+      </div>
+
+      <div class="card">
+        <h2>Cách tính</h2>
+        <pre>E_thiết bị (kWh) = Số lượng × Công suất TB (kW) × Giờ chạy (h)
+E_đêm = tổng E_thiết bị
+E_pin = E_đêm ÷ (Độ sâu xả × Hiệu suất chuyển đổi)</pre>
+        <ul>
+          <li>Máy lạnh Inverter 1,5 HP có công suất điện danh định khoảng 1,1–1,2 kW. Ban đêm máy nén giảm tải nên lấy trung bình khoảng 0,6 kW (50–55% tải).</li>
+          <li>Công suất đồng thời và dòng khởi động cần khảo sát thực tế trước khi chốt inverter.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="res" aria-live="polite">
+        <small>Điện năng ban đêm</small>
+        <div class="big"><span id="rTotWrap" style="margin:0;font-size:inherit;color:inherit"><span id="rTot" style="margin:0;font-size:inherit;color:inherit">0</span></span><span>kWh</span></div>
+        <div class="stack"><i id="sAc" style="background:#ffb066"></i><i id="sOt" style="background:#8fb2e0"></i></div>
+        <div class="row"><small>Máy lạnh</small><span id="rAc"></span></div>
+        <div class="row"><small>Thiết bị khác</small><span id="rOt"></span></div>
+        <hr>
+        <small>Dung lượng pin cần thiết</small>
+        <div class="big"><span id="rPin" style="margin:0;font-size:inherit;color:inherit">0</span><span>kWh</span></div>
+        <small id="rForm"></small>
+        <hr>
+        <small>Số module pin nếu dùng cùng một loại</small>
+        <table class="mods" id="mods"></table>
+        <hr>
+        <small>Công suất đồng thời ước tính</small>
+        <div class="row"><span id="rPeak">0 kW</span><span id="rInv"></span></div>
+        <small style="margin-top:6px">Ước tính sơ bộ: máy lạnh quy về công suất danh định (TB ÷ 0,55), cộng các tải còn lại, dự phòng 20%. Cần khảo sát dòng khởi động.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const LV={
+  cam :{A:{kw:.035,h:12},B:{kw:.06,h:12},C:{kw:.126,h:12}},
+  tv  :{A:{kw:.1,h:3},B:{kw:.1,h:4},C:{kw:.15,h:5}},
+  wifi:{A:{kw:.015,h:12},B:{kw:.025,h:12},C:{kw:.04,h:12}}
+};
+const MODS=[5.12,10.24,16.07,20.07];
+const INV=[5,6,8,10,12,16,20,25];
+const cont=['ac','fridge','cooler','cam','wifi'];  /* dòng chạy liên tục theo khung giờ */
+let R=[
+  {id:'ac',name:'Máy lạnh Inverter',qty:5,kw:.6,h:12},
+  {id:'fridge',name:'Tủ lạnh',qty:1,kw:.125,h:12},
+  {id:'cooler',name:'Tủ mát',qty:1,kw:.25,h:12},
+  {id:'wash',name:'Máy giặt (kWh/mẻ)',qty:1,kw:.7,batch:true},
+  {id:'cam',name:'Camera + đầu ghi',qty:1,kw:.06,h:12},
+  {id:'tv',name:'Tivi',qty:1,kw:.1,h:4},
+  {id:'wifi',name:'Wifi (modem + router/AP)',qty:1,kw:.025,h:12},
+  {id:'x',name:'Tải khác',qty:0,kw:0,h:12,edit:true}
+];
+let level='B';
+const vn=(n,d)=>(+n||0).toLocaleString('vi-VN',{minimumFractionDigits:d==null?1:d,maximumFractionDigits:d==null?2:d});
+const $=s=>document.querySelector(s);
+const e1=r=>r.batch?(r.qty||0)*(r.kw||0):(r.qty||0)*(r.kw||0)*(r.h||0);
+
+function setLevel(l){
+  level=l;
+  ['cam','tv','wifi'].forEach(k=>{const r=R.find(x=>x.id===k);Object.assign(r,LV[k][l]);});
+  const hrs=+$('#hrs').value;
+  ['cam','wifi'].forEach(k=>R.find(x=>x.id===k).h=hrs);
+  document.querySelectorAll('[data-lv]').forEach(b=>b.classList.toggle('on',b.dataset.lv===l));
+  render();
+}
+function buildAcN(){
+  const s=$('#acn');s.innerHTML='';
+  for(let i=1;i<=5;i++){const o=document.createElement('option');o.value=i;o.textContent=i+' máy';if(i===5)o.selected=true;s.appendChild(o);}
+}
+function render(){
+  $('#rows').innerHTML=R.map((r,i)=>{
+    const f=r.batch?`${vn(r.qty,0)} mẻ × ${vn(r.kw,2)}`:`${vn(r.qty,0)} × ${vn(r.kw,3)} × ${vn(r.h,0)}`;
+    return `<tr>
+      <td>${r.edit?`<input class="nm" data-i="${i}" data-k="name" value="${r.name}">`:r.name}</td>
+      <td class="n"><input type="number" min="0" step="1" data-i="${i}" data-k="qty" value="${r.qty}"></td>
+      <td class="n"><input type="number" min="0" step="0.005" data-i="${i}" data-k="kw" value="${r.kw}"></td>
+      <td class="n">${r.batch?'<span class="note">1 mẻ</span>':`<input type="number" min="0" step="0.5" data-i="${i}" data-k="h" value="${r.h}">`}</td>
+      <td class="note">${f}</td>
+      <td class="n kwh" id="k${i}">${vn(e1(r),2)}</td></tr>`;}).join('');
+  calc();
+}
+function calc(){
+  R.forEach((r,i)=>{const c=document.getElementById('k'+i);if(c)c.textContent=vn(e1(r),2);});
+  const tot=R.reduce((a,r)=>a+e1(r),0),ac=e1(R[0]),ot=tot-ac;
+  const dod=(+$('#dod').value||0)/100,eff=(+$('#eff').value||0)/100,den=dod*eff;
+  const pin=den>0?tot/den:0;
+  $('#tot').textContent=vn(tot,2);
+  $('#rTot').textContent=vn(tot,1);
+  $('#rAc').textContent=vn(ac,1)+' kWh';
+  $('#rOt').textContent=vn(ot,1)+' kWh';
+  $('#sAc').style.width=(tot>0?ac/tot*100:0)+'%';
+  $('#sOt').style.width=(tot>0?ot/tot*100:0)+'%';
+  $('#rPin').textContent=vn(pin,1);
+  $('#rForm').textContent=`${vn(tot,2)} ÷ (${vn(dod,2)} × ${vn(eff,2)})`;
+  $('#mods').innerHTML=MODS.map(c=>{const n=pin>0?Math.ceil(pin/c-1e-9):0;return `<tr><td>${vn(c,2)} kWh × ${n}</td><td>${vn(n*c,1)} kWh</td></tr>`}).join('');
+  const peak=R.reduce((a,r)=>a+(r.id==='ac'?(r.qty*r.kw/0.55):r.qty*r.kw),0)*1.2;
+  const inv=INV.find(x=>x>=peak);
+  $('#rPeak').textContent=vn(peak,1)+' kW';
+  $('#rInv').textContent=inv?`→ Hybrid ${inv} kW`:'→ cần > 25 kW';
+}
+$('#rows').addEventListener('input',e=>{
+  const t=e.target,i=+t.dataset.i,k=t.dataset.k;if(isNaN(i))return;
+  R[i][k]=k==='name'?t.value:(parseFloat(t.value)||0);calc();
+});
+document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>setLevel(b.dataset.lv));
+$('#hp').onchange=()=>{R[0].kw=+$('#hp').value;render();};
+$('#acn').onchange=()=>{R[0].qty=+$('#acn').value;render();};
+$('#hrs').onchange=()=>{const h=+$('#hrs').value;cont.forEach(k=>R.find(x=>x.id===k).h=h);render();};
+$('#dod').oninput=calc;$('#eff').oninput=calc;
+buildAcN();setLevel('B');
+</script>
+</body>
+</html>

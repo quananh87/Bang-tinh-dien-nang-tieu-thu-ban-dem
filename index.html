@@ -51,9 +51,12 @@ ul{margin:6px 0 0;padding-left:20px}
 .pk.on{border-color:var(--or);background:#fff7ed}
 .pk b{color:var(--navy)}
 .pk .chip{align-self:flex-start;margin-top:4px}
-.eco td:last-child{text-align:right;font-weight:600}
-.eco{min-width:0;margin-top:6px}
-.eco tr.hl td{background:var(--or2);font-weight:700;color:var(--navy)}
+.sum{min-width:560px}
+.sum td:nth-child(2){color:var(--mut);font-size:13px}
+.sum td:last-child{text-align:right;font-weight:600;white-space:nowrap}
+.sum tr.grp td{background:var(--bg);color:var(--navy);font-weight:700;font-size:14px}
+.sum tr.hl td{background:var(--or2);font-weight:700;color:var(--navy)}
+.sum tr.hl td:nth-child(2){color:var(--mut);font-weight:400}
 @media print{.chip,.bar{display:none}.res{position:static}body{background:#fff}}
 </style>
 </head>
@@ -94,6 +97,15 @@ ul{margin:6px 0 0;padding-left:20px}
         <div class="note" style="margin-top:8px">Công suất TB là công suất điện thực tế bình quân cả đêm, không phải công suất danh định. Máy giặt tính theo số mẻ nhân điện năng mỗi mẻ (kWh/mẻ).</div>
       </div>
 
+      <div class="card">
+        <h2>Bảng kết quả tổng hợp</h2>
+        <div class="tw"><table class="sum">
+          <thead><tr><th>Hạng mục</th><th>Cách tính</th><th class="n">Kết quả</th></tr></thead>
+          <tbody id="sum"></tbody>
+        </table></div>
+        <div class="note" style="margin-top:8px">Phần điện mặt trời lấy theo phương án đang chọn ở mục bên dưới. Công suất đồng thời và cỡ inverter chỉ là ước tính sơ bộ, cần khảo sát dòng khởi động.</div>
+      </div>
+
       <div class="card" id="solar">
         <h2>Công suất điện mặt trời và tiền điện hàng tháng</h2>
         <div class="bar" style="gap:12px">
@@ -110,11 +122,9 @@ ul{margin:6px 0 0;padding-left:20px}
           <label class="f">Giá điện tính tiết kiệm (đ/kWh)<input type="number" min="0" step="10" data-s="price" style="width:110px"></label>
           <label class="f">Tỷ lệ tự dùng (%)<input type="number" min="0" max="100" data-s="self" style="width:90px"></label>
           <label class="f">Tải ban ngày (kWh/ngày)<input type="number" min="0" step="0.5" data-s="day" style="width:110px"></label>
-          <label class="f">Chi phí đầu tư (đ, nếu có)<input type="number" min="0" step="1000000" data-s="cost" style="width:140px"></label>
         </div>
         <div class="note">Đơn giá mặc định lấy theo bảng báo giá: sản xuất 2.200–2.500 đ/kWh, sinh hoạt 3.500–3.800 đ/kWh. Giá điện tính tiết kiệm mặc định 3.015 đ/kWh.</div>
         <div class="pkg" id="pkBox"></div>
-        <table class="eco" id="eco"></table>
       </div>
 
       <div class="card">
@@ -135,8 +145,7 @@ Tiền điện hàng tháng:
   Sản lượng/ngày = kWp × Giờ nắng
   Tiết kiệm/ngày = Sản lượng/ngày × Giá điện × Tỷ lệ tự dùng
   Tiết kiệm/tháng = ×30 · /năm = ×365
-  Tiền điện sau lắp = Tiền điện trước − Tiết kiệm/tháng
-  Hoàn vốn (năm) = Chi phí đầu tư ÷ Tiết kiệm/năm</pre>
+  Tiền điện sau lắp = Tiền điện trước − Tiết kiệm/tháng</pre>
         <ul>
           <li>Máy lạnh Inverter 1,5 HP có công suất điện danh định khoảng 1,1–1,2 kW. Ban đêm máy nén giảm tải nên lấy trung bình khoảng 0,6 kW (50–55% tải).</li>
           <li>Công suất đồng thời và dòng khởi động cần khảo sát thực tế trước khi chốt inverter.</li>
@@ -180,6 +189,7 @@ const LV={
 };
 const MODS=[5.12,10.24,16.07,20.07];
 const INV=[5,6,8,10,12,16,20,25];
+let G={};
 const cont=['ac','fridge','cooler','cam','wifi'];  /* dòng chạy liên tục theo khung giờ */
 let R=[
   {id:'ac',name:'Máy lạnh Inverter',qty:5,kw:.6,h:12},
@@ -238,6 +248,7 @@ function calc(){
   const inv=INV.find(x=>x>=peak);
   $('#rPeak').textContent=vn(peak,1)+' kW';
   $('#rInv').textContent=inv?`→ Hybrid ${inv} kW`:'→ cần > 25 kW';
+  G={tot,pin,dod,eff,peak,inv};
   calc2();
 }
 $('#rows').addEventListener('input',e=>{
@@ -249,10 +260,9 @@ $('#hp').onchange=()=>{R[0].kw=+$('#hp').value;render();};
 $('#acn').onchange=()=>{R[0].qty=+$('#acn').value;render();};
 $('#hrs').onchange=()=>{const h=+$('#hrs').value;cont.forEach(k=>R.find(x=>x.id===k).h=h);render();};
 $('#dod').oninput=calc;$('#eff').oninput=calc;
-buildAcN();setLevel('B');
 
 /* ---- công suất điện mặt trời và tiền điện hàng tháng (theo báo giá) ---- */
-const S2={bill:0,type:'prod',prod:{min:2200,max:2500},home:{min:3500,max:3800},share:100,sun:4,wp:630,price:3015,self:100,day:0,cost:0,sel:'P'};
+const S2={bill:0,type:'prod',prod:{min:2200,max:2500},home:{min:3500,max:3800},share:100,sun:4,wp:630,price:3015,self:100,day:0,sel:'P'};
 function pkgA(){
   const t=S2[S2.type],lo=Math.min(t.min,t.max),hi=Math.max(t.min,t.max);
   if(S2.bill<=0||S2.sun<=0||S2.wp<=0||lo<=0)return [];
@@ -279,27 +289,37 @@ function calc2(){
       :`≈ ${vn(o.kwh,0)} kWh/tháng (${vn(o.price,0)} đ/kWh) → cần ${vn(o.need,2)} kWp · phát ~${vn(o.prod,0)} kWh/tháng`;
     return `<div class="pk${cur&&o.k===cur.k?' on':''}"><b>${o.name}: ${vn(o.kwp,2)} kWp</b><div class="note">${o.note}</div><div>${o.panels} tấm × ${vn(S2.wp,0)} Wp</div><div class="note">${d}</div><button class="chip${cur&&o.k===cur.k?' on':''}" data-sel="${o.k}">${cur&&o.k===cur.k?'Đang chọn':'Chọn'}</button></div>`;
   }).join(''):'<div class="note">Nhập giờ nắng, công suất tấm để tính.</div>';
-  if(!cur){$('#eco').innerHTML='';$('#rKwp').textContent='—';$('#rPan').textContent='';$('#rSave').textContent='—';return;}
-  const kwp=cur.kwp,day=kwp*S2.sun,saveDay=day*S2.price*(S2.self/100),saveM=saveDay*30,saveY=saveDay*365;
-  const kwhM=S2.price>0?S2.bill/S2.price:0;
-  const after=S2.bill>0?Math.max(0,S2.bill-saveM):null;
-  const pay=S2.cost>0&&saveY>0?S2.cost/saveY:null;
-  const rows=[
-    ['Công suất hệ thống đang chọn',vn(kwp,2)+' kWp ('+cur.panels+' tấm)'],
-    ['Điện tiêu thụ hiện tại (theo giá điện '+vn(S2.price,0)+' đ/kWh)',S2.bill>0?vn(kwhM,0)+' kWh/tháng':'—'],
-    ['Sản lượng điện mặt trời/ngày',vn(day,1)+' kWh'],
-    ['Sản lượng điện mặt trời/tháng',vn(day*30,0)+' kWh'],
-    ['Tiền điện trước khi lắp',S2.bill>0?vn(S2.bill,0)+' đ/tháng':'—'],
-    ['Tiết kiệm/ngày',vn(saveDay,0)+' đ'],
-    ['Tiết kiệm/tháng',vn(saveM,0)+' đ'],
-    ['Tiết kiệm/năm',vn(saveY,0)+' đ'],
-    ['Tiền điện sau khi lắp',after==null?'—':vn(after,0)+' đ/tháng'],
-    ['Thời gian hoàn vốn',pay==null?'— (nhập chi phí đầu tư)':vn(pay,2)+' năm']
+
+  const g=G,pct=v=>vn(v,2);
+  const G1=[
+    ['Tổng điện năng ban đêm','Tổng các thiết bị trong bảng',vn(g.tot,2)+' kWh',1],
+    ['Dung lượng pin cần thiết',`${vn(g.tot,2)} ÷ (${pct(g.dod)} × ${pct(g.eff)})`,vn(g.pin,1)+' kWh',1],
+    ['Số module pin (dùng cùng một loại)','Dung lượng pin ÷ dung lượng module',MODS.map(c=>`${vn(c,2)} × ${g.pin>0?Math.ceil(g.pin/c-1e-9):0}`).join(' · ')],
+    ['Công suất đồng thời ước tính','Máy lạnh TB ÷ 0,55 + tải khác, dự phòng 20%',vn(g.peak,1)+' kW'+(g.inv?' → Hybrid '+g.inv+' kW':'')]
   ];
-  $('#eco').innerHTML=rows.map((r,i)=>`<tr${i===6||i===8?' class="hl"':''}><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
-  $('#rKwp').textContent=vn(kwp,2)+' kWp';
-  $('#rPan').textContent=cur.panels+' tấm × '+vn(S2.wp,0)+' Wp';
-  $('#rSave').textContent=vn(saveM,0)+' đ';
+  let G2=[['Điện mặt trời','Chưa đủ dữ liệu để tính','—']],G3=[];
+  if(cur){
+    const kwp=cur.kwp,day=kwp*S2.sun,saveDay=day*S2.price*(S2.self/100),saveM=saveDay*30,saveY=saveDay*365;
+    const after=S2.bill>0?Math.max(0,S2.bill-saveM):null;
+    G2=[
+      ['Công suất điện mặt trời cần ('+cur.name.toLowerCase()+')',cur.k==='P'?`(${vn(cur.chg,1)} + ${vn(S2.day,1)}) ÷ ${vn(S2.sun,1)}`:`${vn(cur.kwh,0)} × ${vn(S2.share,0)}% ÷ (${vn(S2.sun,1)} × 30)`,vn(cur.need,2)+' kWp'],
+      ['Số tấm và công suất thực',`${vn(cur.need*1000,0)} ÷ ${vn(S2.wp,0)}, làm tròn lên`,`${cur.panels} tấm × ${vn(S2.wp,0)} Wp = ${vn(kwp,2)} kWp`,1],
+      ['Sản lượng điện mặt trời/ngày',`${vn(kwp,2)} × ${vn(S2.sun,1)}`,vn(day,1)+' kWh'],
+      ['Sản lượng điện mặt trời/tháng','× 30',vn(day*30,0)+' kWh']
+    ];
+    G3=[
+      ['Tiền điện trước khi lắp','Số liệu nhập vào',S2.bill>0?vn(S2.bill,0)+' đ/tháng':'—'],
+      ['Tiết kiệm/ngày',`${vn(day,1)} × ${vn(S2.price,0)} × ${vn(S2.self,0)}%`,vn(saveDay,0)+' đ'],
+      ['Tiết kiệm/tháng','Tiết kiệm/ngày × 30',vn(saveM,0)+' đ',1],
+      ['Tiết kiệm/năm','Tiết kiệm/ngày × 365',vn(saveY,0)+' đ'],
+      ['Tiền điện sau khi lắp',S2.bill>0?`${vn(S2.bill,0)} − ${vn(saveM,0)}`:'Cần nhập tiền điện TB/tháng',after==null?'—':vn(after,0)+' đ/tháng',1]
+    ];
+    $('#rKwp').textContent=vn(kwp,2)+' kWp';
+    $('#rPan').textContent=cur.panels+' tấm × '+vn(S2.wp,0)+' Wp';
+    $('#rSave').textContent=vn(saveM,0)+' đ';
+  }else{$('#rKwp').textContent='—';$('#rPan').textContent='';$('#rSave').textContent='—';}
+  const grp=(t,it)=>`<tr class="grp"><td colspan="3">${t}</td></tr>`+it.map(r=>`<tr${r[3]?' class="hl"':''}><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+  $('#sum').innerHTML=grp('1. Pin lưu trữ ban đêm (18h–06h)',G1)+grp('2. Điện mặt trời',G2)+(G3.length?grp('3. Tiền điện hàng tháng',G3):'');
 }
 function fillS2(){
   document.querySelectorAll('[data-s]').forEach(el=>{
@@ -315,7 +335,8 @@ $('#solar').addEventListener('input',e=>{
 });
 $('#gtype').onchange=()=>{S2.type=$('#gtype').value;fillS2();calc2();};
 $('#solar').addEventListener('click',e=>{const b=e.target.closest('[data-sel]');if(b){S2.sel=b.dataset.sel;calc2();}});
-fillS2();calc2();
+fillS2();
+buildAcN();setLevel('B');
 </script>
 </body>
 </html>
